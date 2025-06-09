@@ -52,6 +52,9 @@ function openModal(modalId) {
   if (modalId === "taskModal") {
     populateProjectSelects()
     populateStakeholderSelects()
+    document.getElementById("followup-task-group").style.display = "none"
+    document.getElementById("task-is-followup").checked = false
+    document.getElementById("followup-details").style.display = "none"
     if (!currentEditingTask) {
       document.getElementById("taskForm").reset()
       document.getElementById("task-modal-title").textContent = "Add New Task"
@@ -860,29 +863,49 @@ function viewStakeholderDetails(stakeholderId) {
   let followupsHtml = ""
   if (stakeholderFollowups.length > 0) {
     followupsHtml = `
-      <div class="details-section">
-        <h4>Followups (${stakeholderFollowups.length})</h4>
-        <div class="details-content">
-          ${stakeholderFollowups
-            .map(
-              (followup) => `
-            <div class="followup-item">
-              <div class="followup-header">
-                <span class="followup-title">${followup.title}</span>
-                <span class="task-status status-${followup.status}">${followup.status.toUpperCase()}</span>
+    <div class="details-section">
+      <h4>Followups (${stakeholderFollowups.length})</h4>
+      <div class="details-content">
+        ${stakeholderFollowups
+          .map(
+            (followup) => `
+          <div class="followup-item">
+            <div class="followup-header">
+              <span class="followup-title">${followup.title}</span>
+              <div class="followup-status-change">
+                <span class="task-status status-${followup.status}" onclick="toggleFollowupStatusDropdown(event, ${followup.id})" style="cursor: pointer;">
+                  ${followup.status.toUpperCase()} <i class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 0.25rem;"></i>
+                </span>
+                <div class="followup-status-dropdown">
+                  ${["pending", "completed", "cancelled"]
+                    .map((status) =>
+                      status !== followup.status
+                        ? `<div class="followup-status-option" onclick="changeFollowupStatus(${followup.id}, '${status}')">${status.charAt(0).toUpperCase() + status.slice(1)}</div>`
+                        : "",
+                    )
+                    .join("")}
+                </div>
               </div>
-              <div style="font-size: 0.8rem; color: var(--color-text-secondary); margin-top: 0.25rem;">
-                <span class="followup-type">${followup.type.toUpperCase()}</span>
-                ${followup.date ? ` • ${new Date(followup.date).toLocaleDateString()}` : ""}
-              </div>
-              ${followup.description ? `<div style="margin-top: 0.5rem; font-size: 0.85rem;">${followup.description}</div>` : ""}
             </div>
-          `,
-            )
-            .join("")}
-        </div>
+            <div style="font-size: 0.8rem; color: var(--color-text-secondary); margin-top: 0.25rem;">
+              <span class="followup-type">${followup.type.toUpperCase()}</span>
+              ${followup.date ? ` • ${new Date(followup.date).toLocaleDateString()}` : ""}
+            </div>
+            <div class="followup-actions">
+              <button class="btn-edit-followup" onclick="editFollowup(${followup.id})">
+                <i class="fas fa-edit"></i> Edit
+              </button>
+              <button class="btn-delete-followup" onclick="deleteFollowup(${followup.id})">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+        `,
+          )
+          .join("")}
       </div>
-    `
+    </div>
+  `
   }
 
   let tasksHtml = ""
@@ -1082,36 +1105,55 @@ function createStakeholderCard(stakeholder) {
         <span><i class="fas fa-project-diagram"></i> ${stakeholderProjects.length} projects</span>
       </div>
       
+      <div class="stakeholder-quick-actions">
+        <button class="btn-quick btn-add-followup" onclick="currentFollowupStakeholder = ${stakeholder.id}; openModal('followupModal')">
+          <i class="fas fa-comments"></i> Add Followup
+        </button>
+      </div>
+      
       ${
         stakeholderFollowups.length > 0
           ? `
-          <div class="followups-section">
-            <h4 onclick="toggleStakeholderFollowups(this)">
-              <i class="fas fa-comments"></i> Followups (${stakeholderFollowups.length})
-              <i class="fas fa-chevron-down" style="margin-left: auto;"></i>
-            </h4>
-            <div class="followups-list">
-              ${stakeholderFollowups
-                .slice(0, 3)
-                .map(
-                  (followup) => `
-                  <div class="followup-item">
-                    <div class="followup-header">
-                      <span class="followup-title">${followup.title}</span>
-                      <span class="task-status status-${followup.status}">${followup.status.toUpperCase()}</span>
-                    </div>
-                    <div style="font-size: 0.8rem; color: var(--color-text-secondary); margin-top: 0.25rem;">
-                      <span class="followup-type">${followup.type.toUpperCase()}</span>
-                      ${followup.date ? ` • ${new Date(followup.date).toLocaleDateString()}` : ""}
-                    </div>
+    <div class="followups-section">
+      <h4 onclick="toggleStakeholderFollowups(this)">
+        <i class="fas fa-comments"></i> Followups (${stakeholderFollowups.length})
+        <i class="fas fa-chevron-down" style="margin-left: auto;"></i>
+      </h4>
+      <div class="followups-list">
+        ${stakeholderFollowups
+          .slice(0, 3)
+          .map(
+            (followup) => `
+            <div class="followup-item">
+              <div class="followup-header">
+                <span class="followup-title">${followup.title}</span>
+                <div class="followup-status-change">
+                  <span class="task-status status-${followup.status}" onclick="toggleFollowupStatusDropdown(event, ${followup.id})" style="cursor: pointer;">
+                    ${followup.status.toUpperCase()} <i class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 0.25rem;"></i>
+                  </span>
+                  <div class="followup-status-dropdown">
+                    ${["pending", "completed", "cancelled"]
+                      .map((status) =>
+                        status !== followup.status
+                          ? `<div class="followup-status-option" onclick="changeFollowupStatus(${followup.id}, '${status}')">${status.charAt(0).toUpperCase() + status.slice(1)}</div>`
+                          : "",
+                      )
+                      .join("")}
                   </div>
-                `,
-                )
-                .join("")}
-              ${stakeholderFollowups.length > 3 ? `<div style="text-align: center; margin-top: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">+${stakeholderFollowups.length - 3} more</div>` : ""}
+                </div>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--color-text-secondary); margin-top: 0.25rem;">
+                <span class="followup-type">${followup.type.toUpperCase()}</span>
+                ${followup.date ? ` • ${new Date(followup.date).toLocaleDateString()}` : ""}
+              </div>
             </div>
-          </div>
-        `
+          `,
+          )
+          .join("")}
+        ${stakeholderFollowups.length > 3 ? `<div style="text-align: center; margin-top: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">+${stakeholderFollowups.length - 3} more</div>` : ""}
+      </div>
+    </div>
+  `
           : ""
       }
       
@@ -1155,6 +1197,58 @@ function saveFollowup(event) {
   localStorage.setItem("followups", JSON.stringify(followups))
   closeModal("followupModal")
   loadStakeholders()
+}
+
+function editFollowup(followupId) {
+  const followup = followups.find((f) => f.id === followupId)
+  if (!followup) return
+
+  currentEditingFollowup = followup
+  currentFollowupStakeholder = followup.stakeholderId
+
+  document.getElementById("followup-title").value = followup.title
+  document.getElementById("followup-description").value = followup.description
+  document.getElementById("followup-type").value = followup.type
+  document.getElementById("followup-status").value = followup.status
+  document.getElementById("followup-date").value = followup.date
+  document.getElementById("followup-modal-title").textContent = "Edit Followup"
+
+  openModal("followupModal")
+}
+
+function deleteFollowup(followupId) {
+  if (confirm("Are you sure you want to delete this followup?")) {
+    followups = followups.filter((f) => f.id !== followupId)
+    localStorage.setItem("followups", JSON.stringify(followups))
+    loadStakeholders()
+  }
+}
+
+function changeFollowupStatus(followupId, newStatus) {
+  const followup = followups.find((f) => f.id === followupId)
+  if (!followup) return
+
+  followup.status = newStatus
+  localStorage.setItem("followups", JSON.stringify(followups))
+  loadStakeholders()
+
+  // Hide any open status dropdowns
+  document.querySelectorAll(".followup-status-dropdown").forEach((dropdown) => {
+    dropdown.classList.remove("show")
+  })
+}
+
+function toggleFollowupStatusDropdown(event, followupId) {
+  event.stopPropagation()
+
+  // Hide all other dropdowns
+  document.querySelectorAll(".followup-status-dropdown").forEach((dropdown) => {
+    dropdown.classList.remove("show")
+  })
+
+  // Show this dropdown
+  const dropdown = event.target.nextElementSibling
+  dropdown.classList.toggle("show")
 }
 
 // Toggle functions
@@ -1331,8 +1425,8 @@ window.onclick = (event) => {
   }
 
   // Close status dropdowns when clicking outside
-  if (!event.target.closest(".status-change")) {
-    document.querySelectorAll(".status-dropdown").forEach((dropdown) => {
+  if (!event.target.closest(".status-change") && !event.target.closest(".followup-status-change")) {
+    document.querySelectorAll(".status-dropdown, .followup-status-dropdown").forEach((dropdown) => {
       dropdown.classList.remove("show")
     })
   }
